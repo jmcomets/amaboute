@@ -1,0 +1,4 @@
+*.pyc
+ghostdriver.log
+traceback.txt
+__pycache__

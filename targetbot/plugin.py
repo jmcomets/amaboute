@@ -47,7 +47,9 @@ class Plugin:
             %%add_targeted_user <targeted>
         """
         targeted = args['<targeted>']
-        self.targeted_users.add(targeted)
+        nick = mask.split('!')[0]
+        if nick in self.targeters:
+            self.targeted_users.add(targeted)
 
     @command(permission='target')
     def remove_targeted_user(self, mask, data, args):
@@ -55,7 +57,9 @@ class Plugin:
             %%remove_targeted_user <targeted>
         """
         targeted = args['<targeted>']
-        self.targeted_users.remove(targeted)
+        nick = mask.split('!')[0]
+        if nick in self.targeters:
+            self.targeted_users.remove(targeted)
 
     @command(permission='view')
     def list_targeted(self, mask, data, args):

@@ -1,39 +1,66 @@
+import itertools
 import pykov
-from textblob import TextBlob
-from history import load_latest_history, history_messages
-from utils import ngrams
+from textblob_custom import TextBlob
 from tarjan import tarjan
+from history import history_messages
 
-_models = None
+__all__ = ('generate_models_for_history', 'generate_model', 'imitate', 'ALL_NICKS',)
 
-def generate_models(history):
-    models = {}
+ALL_NICKS = 'amaboute'
+
+def ngrams(xs, n):
+    if n <= 1:
+        raise ValueError('n should be > 1')
+    ts = itertools.tee(xs, n)
+    for i, t in enumerate(ts[1:]):
+        for _ in range(i + 1):
+            next(t, None)
+    return zip(*ts)
+
+def compute_transitions(blob, n):
+    transitions = {}
+    for grams in map(lambda wl: tuple(map(lambda w: w.string, wl)), blob.ngrams(n=n)):
+        start, end = grams[:n-1], grams[-1]
+        transitions.setdefault(start, {})
+        transitions[start].setdefault(end, 0)
+        transitions[start][end] += 1
+
+    normalized_transitions = {}
+    for start, ends in transitions.items():
+        total_score = sum(ends.values())
+        for end, value in ends.items():
+            normalized_transitions[start + (end,)] = value / total_score
+    return normalized_transitions
+
+_models = {}
+
+def generate_model(key, blob, n):
+    transitions = compute_transitions(blob, n)
+    chain = pykov.Chain(transitions)
+    _models[key] = chain
+
+def generate_models_for_nick(nick, messages, n):
+    generate_model(nick, TextBlob('\n'.join(messages)), n)
+
+def generate_models_for_history(history, n):
+    all_messages = []
+
     for nick, timed_messages in history.items():
         messages = history_messages(timed_messages)
-
-        transitions = {}
+        all_messages += messages
         blob = TextBlob('\n'.join(messages))
-        for a, b in blob.ngrams(n=2):
-            transitions.setdefault(a, {})
-            transitions[a].setdefault(b, 0)
-            transitions[a][b] += 1
+        generate_model(nick, blob, n)
 
-        normalized_transitions = {}
-        for a, bs in transitions.items():
-            total_bs_score = sum(bs.values())
-            for b, value in bs.items():
-                normalized_transitions[(a, b)] = value / total_bs_score
+    blob = TextBlob('\n'.join(all_messages))
+    generate_model(ALL_NICKS, blob, n)
 
-        chain = pykov.Chain(normalized_transitions)
-        models[nick] = chain
-    return models
-
-def use_cycles(words):
-    word_ngrams = list(ngrams(words, 2))
+def use_cycles(words, repetition_count):
+    word_ngrams = list(ngrams(words, repetition_count))
     vertices = set(word_ngrams)
 
     neighbor_map = {}
-    for a, b in ngrams(word_ngrams, 2):
+    pairs = lambda ls: zip(ls[::2], ls[1::2])
+    for a, b in pairs(word_ngrams):
         neighbor_map.setdefault(a, set())
         neighbor_map[a].add(b)
 
@@ -42,17 +69,13 @@ def use_cycles(words):
     if cycles:
         cycle = max(cycles, key=lambda c: len(c))
         words = []
-        for word, _ in reversed(cycle):
+        for node in reversed(cycle):
+            word = node[0]
             words.append(word)
         words.append(cycle[-1][1])
     return words
 
-def imitate_nick(nick, amount, start=None):
-    global _models
-    if not _models:
-        history = load_latest_history()
-        _models = generate_models(history)
-
+def imitate(nick, amount, start=None, repetition_count=3):
     # get chain if nick in models
     try:
         chain = _models[nick]
@@ -66,6 +89,6 @@ def imitate_nick(nick, amount, start=None):
         raise RuntimeError('unexpected message generation failure')
 
     # use cycle instead of repeating
-    words = use_cycles(words)
+    words = use_cycles(words, repetition_count)
 
     return ' '.join(words)

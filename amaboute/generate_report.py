@@ -2,10 +2,13 @@
 
 import re
 import statistics
-from textblob import TextBlob
+import itertools
+from textblob_custom import TextBlob
 from history import load_latest_history, history_times, history_messages
-from quoting import matches_quote, url_regex
-from utils import flatten, pairs
+from matching import matches_share, matches_hashtag, url_regex
+
+flatten = itertools.chain.from_iterable
+pairs = lambda ls: zip(ls[::2], ls[1::2])
 
 _history = None
 def load_latest_history_lazily():
@@ -31,7 +34,7 @@ def nicks_by_positivity(history):
         #messages = map(lambda msg: msg.lower(), messages)
         messages = list(messages)
         blobs = map(TextBlob, messages)
-        polarity = sum(map(lambda blob: blob.sentiment.polarity, blobs))
+        polarity = sum(map(lambda blob: blob.polarity, blobs))
         polarities[nick] = polarity
 
     nicks_polarized = polarities.items()
@@ -47,7 +50,8 @@ def nicks_by_activity(history):
         times = list(history_times(timed_messages))
         #time_diffs = list(map(lambda x: x[1] - x[0], pairs(times)))
         #activities[nick] = sum(time_diffs) / len(time_diffs)
-        activities[nick] = statistics.stdev(times)
+        if len(times) > 1:
+            activities[nick] = statistics.stdev(times)
 
     min_, max_ = min(activities.values()), max(activities.values())
     activities = activities.items()
@@ -70,13 +74,9 @@ def nicks_by_stupidity(history):
     stupidities = sorted(stupidities, key=lambda i: i[1], reverse=True)
     return stupidities
 
-hashtag_regex = re.compile(r'^#\w+')
-
 @using_history
 def hashtag_count(history):
-    counts = map(lambda i: (i[0], sum(map(lambda msg: len(hashtag_regex.findall(msg)),
-                                          history_messages(i[1])))),
-                 history.items())
+    counts = map(lambda i: (i[0], sum(map(matches_hashtag, history_messages(i[1])))), history.items())
     counts = sorted(counts, key=lambda i: i[1], reverse=True)
     counts = filter(lambda c: c[1], counts)
     return counts

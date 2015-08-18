@@ -2,3 +2,6 @@
 ghostdriver.log
 traceback.txt
 __pycache__
+/backups/*
+/data/*
+/dicts/*

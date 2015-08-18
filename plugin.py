@@ -2,15 +2,15 @@ import time
 import irc3
 from irc3.plugins.command import command
 from irc3.plugins.cron import cron
-from history import load_latest_history, save_history
-from imitate import imitate, generate_models_for_history, generate_model
+from history import load_latest_history, save_history, history_messages
+from imitate import imitate, generate_models_for_history, generate_model, InvalidFirstWord, NickNotIndexed
 from dictionaries import load_datasets
 from recap import recap
 
 @irc3.plugin
 class Plugin:
     ADMIN = 'jmcomets'
-    CHANNEL = 'insa-if'
+    CHANNEL = '#insa-if'
 
     def __init__(self, bot):
         self.bot = bot
@@ -20,7 +20,7 @@ class Plugin:
         self.bot.privmsg(target, message)
 
     def send_message_to_channel(self, message):
-        self.send_message('#{}'.format(self.CHANNEL), message)
+        self.send_message(self.CHANNEL, message)
 
     def send_message_to_admin(self, message):
         self.send_message(self.ADMIN, message)
@@ -47,7 +47,7 @@ class Plugin:
         """Dump the state to a file.
             %%dump
         """
-        save_history(self.history)
+        self.save_history()
 
     @command(permission='admin')
     def index(self, mask, data, args):
@@ -66,7 +66,7 @@ class Plugin:
                 except KeyError:
                     self.send_message_to_admin('no history for nick {}'.format(nick))
                 else:
-                    messages = history_messages(messages)
+                    messages = history_messages(timed_messages)
                     generate_models_for_nick(nick, messages, n)
             else:
                 if self.history:
@@ -86,11 +86,16 @@ class Plugin:
             amount = int(args['<amount>'])
         except (TypeError, ValueError):
             amount = 10
+            self.send_message_to_admin('invalid amount, using default ({})'.format(amount))
 
         # generate message
         try:
             message = imitate(nick, amount, start)
-        except (KeyError, ValueError, RuntimeError) as e:
+        except InvalidFirstWord as e:
+            self.send_message_to_admin('invalid first word {}'.format(e.first_word))
+        except NickNotIndexed as e:
+            self.send_message_to_admin('nick not indexed {}'.format(e.nick))
+        except RuntimeError as e:
             self.send_message_to_admin(str(e))
         else:
             self.send_message_to_channel('< {}> {}'.format(nick, message))
@@ -113,6 +118,10 @@ class Plugin:
     def recap_task(self):
         self.send_recap()
 
+    @cron('* 1 * * *')
+    def dump_task(self):
+        self.save_history()
+
     def send_recap(self):
         if self.history:
             recap_so_far = recap(self.history)
@@ -122,6 +131,14 @@ class Plugin:
             - partages : {most_shares}""".format(**recap_so_far).split('\n')
             for message in messages:
                 self.send_message_to_channel(message)
+
+    def save_history(self):
+        if self.history:
+            filename = save_history(self.history)
+            nb_nicks = len(self.history)
+            nb_messages = sum(len(messages) for messages in self.history.values())
+            self.send_message_to_admin('saved {} messages from {} nicks to {}'.format(
+                nb_messages, nb_nicks, filename))
 
     @irc3.event(irc3.rfc.PRIVMSG)
     def on_privmsg(self, mask, data, target, **kwargs):

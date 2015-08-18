@@ -4,7 +4,8 @@ from textblob_custom import TextBlob
 from tarjan import tarjan
 from history import history_messages
 
-__all__ = ('generate_models_for_history', 'generate_model', 'imitate', 'ALL_NICKS',)
+__all__ = ('generate_models_for_history', 'generate_models_for_nick',
+           'generate_model', 'imitate', 'Error', 'InvalidFirstWord',)
 
 ALL_NICKS = 'amaboute'
 
@@ -54,7 +55,7 @@ def generate_models_for_history(history, n):
     blob = TextBlob('\n'.join(all_messages))
     generate_model(ALL_NICKS, blob, n)
 
-def use_cycles(words, repetition_count):
+def cut_cycles(words, repetition_count):
     word_ngrams = list(ngrams(words, repetition_count))
     vertices = set(word_ngrams)
 
@@ -79,16 +80,36 @@ def imitate(nick, amount, start=None, repetition_count=3):
     # get chain if nick in models
     try:
         chain = _models[nick]
-    except KeyError:
-        raise ValueError('no model for nick "{}"'.format(nick))
+    except KeyError as e:
+        raise NickNotIndexed('no model for nick "{}"'.format(nick)) from e
 
     # generate words
     try:
         words = chain.walk(amount, start)
-    except UnboundLocalError:
-        raise RuntimeError('unexpected message generation failure')
+    except KeyError as e:
+        raise InvalidFirstWord(start)
+    except (UnboundLocalError, IndexError) as e:
+        print('imitate(nick={}, amount={}, start={}, repetition_count={})'.format(nick, amount, start, repetition_count))
+        raise RuntimeError('unexpected message generation failure') from e
 
     # use cycle instead of repeating
-    words = use_cycles(words, repetition_count)
+    if repetition_count is not None:
+        words = cut_cycles(words, repetition_count)
 
     return ' '.join(words)
+
+class Error(Exception): pass
+
+class InvalidFirstWord(Error, ValueError):
+    def __init__(self, first_word):
+        self.first_word = first_word
+
+class NickNotIndexed(Error, ValueError):
+    def __init__(self, nick):
+        self.nick = nick
+
+if __name__ == '__main__':
+    from dictionaries import load_datasets
+    nick, dataset = next(load_datasets())
+    generate_model(nick, dataset, 4)
+    print(nick, ':', imitate(nick, 10))

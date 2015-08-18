@@ -3,7 +3,7 @@
 import re
 import statistics
 import itertools
-from textblob_custom import TextBlob
+from textblob import TextBlob
 from history import load_latest_history, history_times, history_messages
 from matching import matches_share, matches_hashtag, url_regex
 

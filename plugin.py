@@ -67,12 +67,12 @@ class Plugin:
                     self.send_message_to_admin('no history for nick {}'.format(nick))
                 else:
                     messages = history_messages(timed_messages)
-                    generate_models_for_nick(nick, messages, n)
+                    generate_model_for_nick(nick, messages, n)
             else:
                 if self.history:
                     generate_models_for_history(self.history, n)
                 for nick, dataset in load_datasets():
-                    generate_model(nick, dataset, n)
+                    generate_model_for_nick(nick, (dataset,), n)
 
     @command(permission='imitate')
     def imitate(self, mask, data, args):

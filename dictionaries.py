@@ -1,5 +1,5 @@
 import os
-from textblob_custom import TextBlob
+from textblob import TextBlob
 
 __all__ = ('load_datasets',)
 
@@ -13,4 +13,4 @@ def load_datasets():
     for nick, dataset in DATASETS.items():
         with open(os.path.join(this_dir, 'dicts', dataset), 'r') as fp:
             content = fp.read()
-        yield nick, TextBlob(content)
+        yield nick, content

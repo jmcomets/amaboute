@@ -143,7 +143,7 @@ class Plugin:
         if self.history:
             index_models_for_history(self.history, n)
         for nick, dataset in load_datasets():
-            index_model_for_nick(nick, (dataset,), n)
+            index_model_for_nick(nick, dataset, n)
 
     @irc3.event(irc3.rfc.PRIVMSG)
     def on_privmsg(self, mask, data, target, **kwargs):

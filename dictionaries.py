@@ -6,6 +6,7 @@ this_dir = os.path.dirname(os.path.realpath(__file__))
 
 DATASETS = {
         'Rousseau': 'rousseau.txt',
+        'Booba': 'booba.txt',
         }
 
 def load_datasets():

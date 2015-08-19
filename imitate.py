@@ -1,4 +1,5 @@
 import itertools
+from types import GeneratorType as generator
 from asyncio import get_event_loop, coroutine
 from concurrent.futures import ThreadPoolExecutor
 from markovify.text import NewlineText
@@ -14,16 +15,13 @@ _models = {}
 flatten = itertools.chain.from_iterable
 
 class HistoryText(NewlineText):
-    def __init__(self, messages, n=2):
-        super().__init__(messages, state_size=n)
+    def __init__(self, text, n=2):
+        super().__init__(text, state_size=n)
 
-    def sentence_split(self, messages):
-        return super().sentence_split('\n'.join(messages))
-
-def index_model_for_nick(nick, messages, n):
-    if type(messages) != list:
-        messages = list(messages)
-    _models[nick] = HistoryText(messages, n)
+def index_model_for_nick(nick, text, n):
+    if type(text) != str:
+        text = '\n'.join(text)
+    _models[nick] = HistoryText(text, n)
 
 def index_models_for_history(history, n):
     all_messages = []
@@ -56,16 +54,26 @@ class NickNotIndexed(Error, ValueError):
         self.nick = nick
 
 if __name__ == '__main__':
-    def main():
-        #from dictionaries import load_datasets
-        #nick, dataset = next(load_datasets())
-        #index_model_for_nick(nick, [dataset], 2)
+    import sys
 
+    if len(sys.argv) < 2:
+        print('no nick given', file=sys.stderr)
+        sys.exit(1)
+    nick = sys.argv[1]
+
+    def main():
         from history import load_latest_history
-        nick = 'etkadt'
+        from dictionaries import load_datasets
+
         history = load_latest_history()
-        timed_messages = history[nick]
-        messages = history_messages(timed_messages)
+        try:
+            timed_messages = history[nick]
+        except KeyError:
+            for dataset_nick, dataset in load_datasets():
+                if dataset_nick == nick:
+                    messages = dataset
+        else:
+            messages = history_messages(timed_messages)
         index_model_for_nick(nick, messages, 2)
 
         for _ in range(10):

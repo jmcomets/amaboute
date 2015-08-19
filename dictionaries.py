@@ -1,5 +1,4 @@
 import os
-from textblob import TextBlob
 
 __all__ = ('load_datasets',)
 

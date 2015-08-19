@@ -1,9 +1,13 @@
+import sys
 import time
+from asyncio import coroutine
+
 import irc3
 from irc3.plugins.command import command
 from irc3.plugins.cron import cron
+
 from history import load_latest_history, save_history, history_messages
-from imitate import imitate, generate_models_for_history, generate_model, InvalidFirstWord, NickNotIndexed
+from imitate import generate_imitation, index_model_for_nick, index_models_for_history, NickNotIndexed
 from dictionaries import load_datasets
 from recap import recap
 
@@ -52,51 +56,49 @@ class Plugin:
     @command(permission='admin')
     def index(self, mask, data, args):
         """Index markov models
-            %%index <n> [<nick>]
+            %%index [<n>] [<nick>]
         """
-        try:
-            n = int(args['<n>'])
-        except ValueError as e:
-            self.send_message_to_admin(str(e))
+        n = args['<n>']
+        if n is None:
+            n = 2
         else:
-            nick = args['<nick>']
-            if nick:
-                try:
-                    timed_messages = self.history[nick]
-                except KeyError:
-                    self.send_message_to_admin('no history for nick {}'.format(nick))
-                else:
-                    messages = history_messages(timed_messages)
-                    generate_model_for_nick(nick, messages, n)
+            try:
+                n = validate_n(n)
+            except ValueError as e:
+                sender = mask.split('!')[0]
+                self.send_message(sender, str(e))
+                return
+
+        nick = args['<nick>']
+        if nick:
+            try:
+                timed_messages = self.history[nick]
+            except KeyError:
+                self.send_message_to_admin('no history for nick {}'.format(nick))
             else:
-                if self.history:
-                    generate_models_for_history(self.history, n)
-                for nick, dataset in load_datasets():
-                    generate_model_for_nick(nick, (dataset,), n)
+                messages = history_messages(timed_messages)
+                index_model_for_nick(nick, messages, n)
+        else:
+            self.index_all(n)
 
     @command(permission='imitate')
+    @coroutine
     def imitate(self, mask, data, args):
         """Imitate another person, passing in the number of words to generate
         and the word to start with.
-            %%imitate <nick> [<amount>] [<start>]
+            %%imitate <nick>
         """
         nick = args['<nick>']
-        start = args['<start>']
-        try:
-            amount = int(args['<amount>'])
-        except (TypeError, ValueError):
-            amount = 10
-            self.send_message_to_admin('invalid amount, using default ({})'.format(amount))
 
         # generate message
         try:
-            message = imitate(nick, amount, start)
-        except InvalidFirstWord as e:
-            self.send_message_to_admin('invalid first word {}'.format(e.first_word))
+            message = yield from generate_imitation(nick)
         except NickNotIndexed as e:
-            self.send_message_to_admin('nick not indexed {}'.format(e.nick))
+            sender = mask.split('!')[0]
+            self.send_message(sender, 'nick not indexed {}'.format(e.nick))
         except RuntimeError as e:
             self.send_message_to_admin(str(e))
+            print(e, file=sys.stderr)
         else:
             self.send_message_to_channel('< {}> {}'.format(nick, message))
 
@@ -105,24 +107,6 @@ class Plugin:
         """Recap of the day.
             %%recap
         """
-        self.send_recap()
-
-    @command(permission='view')
-    def help(self, mask, data, args):
-        """I'm not here to help!
-            %%help [<command>]
-        """
-        yield '404 - Not Found'
-
-    @cron('* 17 * * *')
-    def recap_task(self):
-        self.send_recap()
-
-    @cron('* 1 * * *')
-    def dump_task(self):
-        self.save_history()
-
-    def send_recap(self):
         if self.history:
             recap_so_far = recap(self.history)
             messages = """Récapitulatif :
@@ -132,6 +116,21 @@ class Plugin:
             for message in messages:
                 self.send_message_to_channel(message)
 
+    @command(permission='view')
+    def help(self, mask, data, args):
+        """I'm not here to help!
+            %%help [<command>]
+        """
+        yield '404 - Not Found'
+
+    @cron('0 * * * *')
+    def dump_task(self):
+        self.save_history()
+
+    @cron('0 8 * * *')
+    def index_task(self):
+        self.index_all()
+
     def save_history(self):
         if self.history:
             filename = save_history(self.history)
@@ -140,9 +139,26 @@ class Plugin:
             self.send_message_to_admin('saved {} messages from {} nicks to {}'.format(
                 nb_messages, nb_nicks, filename))
 
+    def index_all(self, n=2):
+        if self.history:
+            index_models_for_history(self.history, n)
+        for nick, dataset in load_datasets():
+            index_model_for_nick(nick, (dataset,), n)
+
     @irc3.event(irc3.rfc.PRIVMSG)
     def on_privmsg(self, mask, data, target, **kwargs):
         if target == self.CHANNEL and not data.startswith('!') and not data.startswith('/'):
             nick = mask.split('!')[0]
             self.history.setdefault(nick, [])
             self.history[nick].append((time.time(), data))
+
+def validate_n(n):
+    try:
+        n = int(n)
+    except ValueError as e:
+        raise ValueError('invalid n {}, should be an integer'.format(n)) from e
+    else:
+        available_ns = [2, 3]
+        if n not in available_ns:
+            raise ValueError('invalid n, available are: {}'.format(available_ns))
+        return n

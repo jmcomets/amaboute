@@ -45,7 +45,10 @@ def filter_history(history):
     history = {nick: [(t, message) for t, message in timed_messages]
                for nick, timed_messages in history.items()}
 
-    filter_smileys(history['etkadt'])
+    try:
+        filter_smileys(history['etkadt'])
+    except KeyError:
+        pass
 
     filter_actions(history)
     #filter_mentions(history)

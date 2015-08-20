@@ -9,7 +9,6 @@ from irc3.plugins.cron import cron
 from history import load_latest_history, save_history, history_messages
 from imitate import generate_imitation, index_model_for_nick, index_models_for_history, NickNotIndexed
 from dictionaries import load_datasets
-from recap import recap
 
 @irc3.plugin
 class Plugin:
@@ -101,20 +100,6 @@ class Plugin:
             print(e, file=sys.stderr)
         else:
             self.send_message_to_channel('< {}> {}'.format(nick, message))
-
-    @command(permission='recap')
-    def recap(self, mask, data, args):
-        """Recap of the day.
-            %%recap
-        """
-        if self.history:
-            recap_so_far = recap(self.history)
-            messages = """Récapitulatif :
-            - activité : {most_active}
-            - hashtags : {most_hashtags}
-            - partages : {most_shares}""".format(**recap_so_far).split('\n')
-            for message in messages:
-                self.send_message_to_channel(message)
 
     @command(permission='view')
     def help(self, mask, data, args):

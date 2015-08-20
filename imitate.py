@@ -1,8 +1,10 @@
 import itertools
-from types import GeneratorType as generator
 from asyncio import get_event_loop, coroutine
 from concurrent.futures import ThreadPoolExecutor
+
+from markovify import split_into_sentences
 from markovify.text import NewlineText
+
 from history import history_messages
 
 __all__ = ('index_models_for_history', 'index_model_for_nick',
@@ -17,6 +19,10 @@ flatten = itertools.chain.from_iterable
 class HistoryText(NewlineText):
     def __init__(self, text, n=2):
         super().__init__(text, state_size=n)
+
+    def sentence_split(self, text):
+        sentences =  super().sentence_split(text)
+        return list(flatten(map(split_into_sentences, sentences)))
 
 def index_model_for_nick(nick, text, n):
     if type(text) != str:
@@ -65,16 +71,21 @@ if __name__ == '__main__':
         from history import load_latest_history
         from dictionaries import load_datasets
 
+        n = 2
         history = load_latest_history()
-        try:
-            timed_messages = history[nick]
-        except KeyError:
-            for dataset_nick, dataset in load_datasets():
-                if dataset_nick == nick:
-                    messages = dataset
+
+        if nick == ALL_NICKS:
+            index_models_for_history(history, n)
         else:
-            messages = history_messages(timed_messages)
-        index_model_for_nick(nick, messages, 2)
+            try:
+                timed_messages = history[nick]
+            except KeyError:
+                for dataset_nick, dataset in load_datasets():
+                    if dataset_nick == nick:
+                        messages = dataset
+            else:
+                messages = history_messages(timed_messages)
+            index_model_for_nick(nick, messages, n)
 
         for _ in range(10):
             sentence = yield from generate_imitation(nick)

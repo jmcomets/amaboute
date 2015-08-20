@@ -2,7 +2,6 @@ import os
 import re
 import time
 import json
-from matching import url_regex
 
 __all__ = ('save_history', 'load_latest_history',
            'history_times', 'history_messages',)
@@ -34,84 +33,26 @@ def load_latest_history(base_dir=data_dir):
 def load_history(filename):
     with open(filename, 'r') as fp:
         history = json.load(fp)
-    return filter_history(history)
+
+    # filter history
+    for nick, timed_messages in history.items():
+        for i, tm in enumerate(timed_messages):
+            t, message = tm
+            message = filter_message(message)
+            timed_messages[i] = t, message
+    return history
 
 history_times = lambda timed_messages: map(lambda tm: tm[0], timed_messages)
 history_messages = lambda timed_messages: map(lambda tm: tm[1], timed_messages)
 
-# private stuff
+url_regex = re.compile(r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’]))")
 
-def filter_history(history):
-    history = {nick: [(t, message) for t, message in timed_messages]
-               for nick, timed_messages in history.items()}
-
-    try:
-        filter_smileys(history['etkadt'])
-    except KeyError:
-        pass
-
-    filter_actions(history)
-    #filter_mentions(history)
-    filter_commands(history)
-
-    #filter_nicks(history)
-    filter_links(history)
-
-    filter_characters(history)
-    return history
-
-def history_message_filter(f):
-    def inner(history):
-        for nick, timed_messages in history.items():
-            for i, tm in enumerate(timed_messages):
-                t, message = tm
-                message = f(message)
-                timed_messages[i] = t, message
-    return inner
-
-@history_message_filter
-def filter_actions(message):
-    message = message.replace('\u0001ACTION', '/me')
+def filter_message(message):
+    # actions
+    message = message.replace('\u0001ACTION', '[action]')
     message = message.replace('\u0001', '')
+
+    # links
+    message = url_regex.sub('[lien]', message)
+
     return message
-
-mention_regex = re.compile(r'^\w+:?')
-
-@history_message_filter
-def filter_mentions(message):
-    return mention_regex.sub('MENTION', message)
-
-characters_regex = re.compile(r'"|<|>|:|\^')
-
-@history_message_filter
-def filter_characters(message):
-    return characters_regex.sub('', message)
-
-smileys = (':)', '^^', '=)', ':-)',)
-
-def filter_smileys(timed_messages):
-    for i, tm in enumerate(timed_messages):
-        t, message = tm
-        for smiley in smileys:
-            message = message.replace(smiley, '')
-        timed_messages[i] = t, message
-
-def filter_commands(history):
-    for nick, timed_messages in history.items():
-        history[nick] = [(t, message) for t, message in timed_messages
-                         if not message.startswith('!')]
-
-def filter_nicks(history):
-    for nick, timed_messages in history.items():
-        for i, tm in enumerate(timed_messages):
-            t, message = tm
-            for nick in history.keys():
-                message = message.replace(nick, 'MENTION')
-            timed_messages[i] = t, message
-
-def filter_links(history):
-    for nick, timed_messages in history.items():
-        for i, tm in enumerate(timed_messages):
-            t, message = tm
-            message = url_regex.sub('LIEN', message)
-            timed_messages[i] = t, message

@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     def main():
         from history import load_latest_history
-        from dictionaries import load_datasets
+        from datasets import load_datasets
 
         n = 2
         history = load_latest_history()

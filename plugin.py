@@ -8,7 +8,6 @@ from irc3.plugins.cron import cron
 
 from history import load_latest_history, save_history, history_messages
 from imitate import generate_imitation, index_model_for_nick, index_models_for_history, NickNotIndexed
-from dictionaries import load_datasets
 
 @irc3.plugin
 class Plugin:
@@ -108,11 +107,11 @@ class Plugin:
         """
         yield '404 - Not Found'
 
-    @cron('0 * * * *')
+    @cron('0 12,18 * * 1-5')
     def dump_task(self):
         self.save_history()
 
-    @cron('0 8 * * *')
+    @cron('0 09-18 * * 1-5')
     def index_task(self):
         self.index_all()
 
@@ -127,8 +126,6 @@ class Plugin:
     def index_all(self, n=2):
         if self.history:
             index_models_for_history(self.history, n)
-        for nick, dataset in load_datasets():
-            index_model_for_nick(nick, dataset, n)
 
     @irc3.event(irc3.rfc.PRIVMSG)
     def on_privmsg(self, mask, data, target, **kwargs):

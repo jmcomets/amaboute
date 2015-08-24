@@ -28,14 +28,14 @@ class Plugin:
         self.send_message(self.ADMIN, message)
 
     @command(permission='admin')
-    def message(self, mask, data, args):
+    def message(self, mask, target, args):
         """Send a message.
             %%message [<message>...]
         """
         self.send_message_to_channel(' '.join(args['<message>']))
 
     @command(permission='admin')
-    def load(self, mask, data, args):
+    def load(self, mask, target, args):
         """Load the state from a file.
             %%load
         """
@@ -45,14 +45,14 @@ class Plugin:
             self.send_message_to_admin(str(e))
 
     @command(permission='admin')
-    def dump(self, mask, data, args):
+    def dump(self, mask, target, args):
         """Dump the state to a file.
             %%dump
         """
         self.save_history()
 
     @command(permission='admin')
-    def index(self, mask, data, args):
+    def index(self, mask, target, args):
         """Index markov models
             %%index [<n>] [<nick>]
         """
@@ -81,27 +81,29 @@ class Plugin:
 
     @command(permission='imitate')
     @coroutine
-    def imitate(self, mask, data, args):
+    def imitate(self, mask, target, args):
         """Imitate another person, passing in the number of words to generate
         and the word to start with.
             %%imitate <nick>
         """
         nick = args['<nick>']
+        sender = mask.split('!')[0]
 
-        # generate message
-        try:
-            message = yield from generate_imitation(nick)
-        except NickNotIndexed as e:
-            sender = mask.split('!')[0]
-            self.send_message(sender, 'nick not indexed {}'.format(e.nick))
-        except RuntimeError as e:
-            self.send_message_to_admin(str(e))
-            print(e, file=sys.stderr)
+        if target == self.CHANNEL:
+            self.send_message(sender, "Pour eviter le spam, merci d'utiliser /msg")
         else:
-            self.send_message_to_channel('< {}> {}'.format(nick, message))
+            try:
+                message = yield from generate_imitation(nick)
+            except NickNotIndexed as e:
+                self.send_message(sender, 'nick not indexed {}'.format(e.nick))
+            except RuntimeError as e:
+                self.send_message_to_admin(str(e))
+                print(e, file=sys.stderr)
+            else:
+                self.send_message_to_channel('< {} ({})> {}'.format(nick, sender, message))
 
     @command(permission='view')
-    def help(self, mask, data, args):
+    def help(self, mask, target, args):
         """I'm not here to help!
             %%help [<command>]
         """

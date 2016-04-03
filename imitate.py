@@ -39,8 +39,20 @@ def index_models_for_history(history, n):
 
 _executor = ThreadPoolExecutor(max_workers=2)
 
-@coroutine
 def generate_imitation(nick, nb_tries=10):
+    try:
+        model = _models[nick]
+    except KeyError as e:
+        raise NickNotIndexed('no model for nick "{}"'.format(nick)) from e
+    else:
+        for _ in range(nb_tries):
+            imitation = model.make_sentence()
+            if imitation is not None:
+                return imitation
+        raise RuntimeError('imitation generation failure')
+
+@coroutine
+def generate_imitation_async(nick, nb_tries=10):
     try:
         model = _models[nick]
     except KeyError as e:

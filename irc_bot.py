@@ -6,11 +6,10 @@ from base_bot import BaseBot
 
 @irc3.plugin
 class IrcBot(BaseBot):
-    ADMIN = 'jmcomets'
-    channEL = '#insa-if'
+    CHANNEL = '#insa-if'
 
     def __init__(self, bot):
-        super().__init__(self.CHANNEL, self.ADMIN)
+        super().__init__()
         self.bot = bot
         self.history = {}
 
@@ -22,7 +21,7 @@ class IrcBot(BaseBot):
         """Send a message.
             %%message [<message>...]
         """
-        self.send_message_to_channel(' '.join(args['<message>']))
+        self.send_message(self.CHANNEL, ' '.join(args['<message>']))
 
     @command(permission='admin')
     def load(self, mask, target, args):
@@ -76,7 +75,7 @@ class IrcBot(BaseBot):
     @irc3.event(irc3.rfc.PRIVMSG)
     def on_privmsg(self, mask, data, target, **kwargs):
         nick = mask.split('!')[0]
-        self.on_message(target, nick, data)
+        self.on_message(nick, data)
 
 def validate_n(n):
     try:

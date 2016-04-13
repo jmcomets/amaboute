@@ -51,10 +51,13 @@ class BaseBot:
             self.send_message(sender, 'nick not indexed {}'.format(e.nick))
         except RuntimeError as e:
             logging.error(str(e))
-            print(e, file=sys.stderr)
         else:
             self.send_message(target, '[{}]: {}'.format(nick, message))
             self.send_message(target, '(sent by: {})'.format(sender))
+
+    def load_and_index(self, n=2):
+        self.load_latest_history()
+        self.index_all(n)
 
     def index_all(self, n=2):
         if self.history:
@@ -64,6 +67,9 @@ class BaseBot:
     def load_latest_history(self):
         try:
             self.history = load_latest_history()
+            nb_nicks = len(self.history)
+            nb_messages = sum(map(len, self.history.values()))
+            logging.info('loaded history with {} nicks, {} messages'.format(nb_nicks, nb_messages))
         except IOError as e:
             logging.error(str(e))
 

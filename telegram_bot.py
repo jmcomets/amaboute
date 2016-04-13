@@ -3,7 +3,6 @@ from difflib import get_close_matches
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 from telegram.ext import Updater
-from slugify import slugify
 
 from base_bot import BaseBot
 
@@ -24,9 +23,6 @@ class TelegramBot(BaseBot):
         self._add_command('index', admin_only=True, fn=self.index_all)
         self._add_command('save', admin_only=True, fn=self.save_history)
 
-    def _get_username(self, user):
-        return slugify('{} {}'.format(user.first_name, user.last_name))
-
     def _add_command(self, name, admin_only=False, fn=None):
         if fn is None:
             try:
@@ -37,7 +33,7 @@ class TelegramBot(BaseBot):
             old_fn, fn = fn, lambda _1, _2: old_fn()
         def inner(bot, update):
             self.bot = bot
-            username = self._get_username(update.message.from_user)
+            username = update.message.from_user.username
             has_authorizaion = not admin_only or username == self.admin
             spamming = update.message.chat_id == self.channel
             if has_authorizaion and not spamming:
@@ -50,9 +46,8 @@ class TelegramBot(BaseBot):
             self.bot.sendMessage(chat_id=target, text=message)
 
     def _guess_username(self, username):
-        slugged_username = slugify(username)
         candidates = self.history.keys()
-        matches = get_close_matches(slugged_username, candidates, 1, 0.4)
+        matches = get_close_matches(username, candidates, 1)
         try:
             return matches[0]
         except IndexError:
@@ -77,7 +72,7 @@ class TelegramBot(BaseBot):
 
     def message_handler(self, bot, update):
         self.bot = bot
-        username = self._get_username(update.message.from_user)
+        username = update.message.from_user.username
         message = update.message.text
         chat = update.message.chat_id
         logging.info('received a message from {} on {}: {}'.format(username, chat, message))

@@ -1,34 +1,39 @@
 import logging
 from difflib import get_close_matches
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 from telegram.ext import Updater
 from slugify import slugify
 
-from base_bot import BaseBot
-from imitate import ALL_NICKS
+logging.basicConfig(level=logging.DEBUG,
+                    format=('%(asctime)s - '
+                            '%(name)s - '
+                            '%(levelname)s - '
+                            '%(message)s'))
 
-class TelegramBot(BaseBot):
-    def __init__(self, token, admin, channel, nb_messages_before_backup=100, default_index_dimension=2):
-        super().__init__()
+from models import Dao
+from imitate import Imitator
+
+class TelegramBot:
+    def __init__(self, token, admin, channel,
+                 nb_messages_before_backup=100,
+                 default_index_dimension=2):
+        self.user_ids = {}
         self.admin = admin
         self.channel = channel
         self.updater = Updater(token=token)
-        self.initial_countdown = nb_messages_before_backup
-        self.countdown = self.initial_countdown
-        self.user_ids = {}
-        self.n = default_index_dimension
-        self._setup_commands()
+        self.countdown = Countdown(nb_messages_before_backup)
+        self.countdown.add_callback(self.on_countdown_finished)
+        self.indexing_dimension = default_index_dimension
+        self.Dao = dao()
+        self.setup_commands()
+        self.imitation_models = ImitationModels(self.dao)
 
-    def _setup_commands(self):
+    def setup_commands(self):
         self.updater.dispatcher.addTelegramMessageHandler(self.message_handler)
-        self._add_command('imitate', aliases=['i'])
-        self._add_command('dimension', aliases=['n'], admin_only=True)
-        self._add_command('load', admin_only=True, fn=self.load_and_index, aliases=['l'])
-        self._add_command('index', admin_only=True, fn=self.index_models, aliases=['r'])
-        self._add_command('save', admin_only=True, fn=self.save_history, aliases=['s', 'w'])
+        self.add_command('imitate', aliases=['i'])
+        self.add_command('dimension', aliases=['n'], admin_only=True)
+        self.add_command('index', admin_only=True, fn=self.index_models, aliases=['r'])
 
-    def _get_username(self, user):
+    def get_username(self, user):
         username = user.username
         if not username:
             username = slugify('{} {}'.format(user.first_name, user.last_name))
@@ -36,7 +41,7 @@ class TelegramBot(BaseBot):
             username = username.lower()
         return username
 
-    def _add_command(self, name, admin_only=False, fn=None, aliases=None):
+    def add_command(self, name, admin_only=False, fn=None, aliases=None):
         if aliases is None:
             aliases = []
         logging.info('adding command: {}, aliases are {}'.format(name, ', '.join(aliases)))
@@ -54,7 +59,7 @@ class TelegramBot(BaseBot):
         def inner(bot, update):
             logging.info('processing command {}'.format(name))
             self.bot = bot
-            username = self._get_username(update.message.from_user)
+            username = self.get_username(update.message.from_user)
             has_authorization = not admin_only or username == self.admin
             spamming = update.message.chat_id == self.channel
             if has_authorization and not spamming:
@@ -78,39 +83,7 @@ class TelegramBot(BaseBot):
         else:
             self.send_message(user_id, message)
 
-    def _guess_username(self, username):
-        username = username.lower()
-        if username in self.history or username == ALL_NICKS:
-            return username
-        candidates = self.history.keys()
-        matches = get_close_matches(username, candidates, 1)
-        try:
-            return matches[0]
-        except IndexError:
-            return None
-
-    def imitate_command(self, username, message):
-        if not self.history:
-            self.send_message_to_user(username, "I'm sorry {}, I can't do that.".format(username))
-            return
-        args = message.strip().split()
-        if len(args) < 2:
-            self.send_message_to_user(username, 'You could at least tell me WHO you want to imitate!')
-            return
-        tried_username = ' '.join(args[1:])
-        user_to_imitate = self._guess_username(tried_username)
-        if user_to_imitate is None:
-            user_list = '\n'.join(map(lambda k: '- {}'.format(k), self.history))
-            self.send_message_to_user(username, "Either you're drunk, dumb or "
-                                                "an asshole, but {} ain't in "
-                                                "my book. Here's those I know "
-                                                "so far:\n{}".format(tried_username,
-                                                                     user_list))
-            return
-        self.imitate_nick(self.channel, username, user_to_imitate)
-
     def dimension_command(self, username, message):
-        self.n = message
         args = message.strip().split()
         if len(args) < 2:
             self.send_message_to_user(username, 'No N specified')
@@ -120,29 +93,106 @@ class TelegramBot(BaseBot):
         except ValueError:
             self.send_message_to_user(username, 'Could not convert {} to an integer'.format(args[1]))
         else:
-            self.n = n
+            self.indexing_dimension = n
             self.index_models()
+
+    def get_registered_nicknames(self):
+        return set(map(lambda p: p.nickname,
+                       self.dao.registered_profiles()))
+
+    def guess_username(self, username):
+        username = username.lower()
+        candidates = self.get_registered_nicknames()
+        if username in candidates:
+            return username
+        matches = get_close_matches(username, candidates, 1)
+        try:
+            return matches[0]
+        except IndexError:
+            return None
+
+    def imitate_command(self, username, message):
+        candidates = self.get_registered_nicknames()
+        args = message.strip().split()
+        if len(args) < 2:
+            self.send_message_to_user(username, 'You could at least tell me WHO you want to imitate!')
+            return
+        tried_username = ' '.join(args[1:])
+        user_to_imitate = self.guess_username(tried_username)
+        if user_to_imitate is None:
+            user_list = '\n'.join(map(lambda k: '- {}'.format(k), candidates))
+            self.send_message_to_user(username, "Either you're drunk, dumb or "
+                                                "an asshole, but {} ain't in "
+                                                "my book. Here's those I know "
+                                                "so far:\n{}".format(tried_username,
+                                                                     user_list))
+            return
+        self.imitate_nick(username, user_to_imitate)
+
+    def imitate_nick(self, username, user_to_imitate):
+        imitation = self.imitation_models.generate_imitation(user_to_imitate)
+        if imitation is None:
+            return # TODO: error logging
+        self.send_message(('[{}]: {}'
+                           '\n'
+                           '(sent by: {})').format(username,
+                                                   imitation,
+                                                   user_to_imitate))
 
     def index_models(self):
-        self.index_all(self.n)
+        self.imitation_models.index(self.indexing_dimension)
 
-    def _post_message(self):
-        self.countdown -= 1
-        if self.countdown <= 0:
-            self.save_history()
-            self.index_models()
-            self.countdown = self.initial_countdown
+    def on_message(self, username, message):
+        self.dao.add_message(username, message)
+
+    def on_countdown_finished(self):
+        self.index_models()
 
     def message_handler(self, bot, update):
         self.bot = bot
         user = update.message.from_user
-        username = self._get_username(user)
+        username = self.get_username(user)
         self.user_ids[username] = user.id
         message = update.message.text
         chat = update.message.chat_id
         logging.info('received a message from {} on {}: {}'.format(username, chat, message))
         self.on_message(username, message)
-        self._post_message()
+        self.countdown.tick()
 
     def run(self):
         self.updater.start_polling()
+
+class Countdown:
+    def __init__(self, initial):
+        self.callbacks = []
+        self.initial = initial
+        self.current = initial
+
+    def tick(self):
+        self.current -= 1
+        if self.current <= 0:
+            self.current = initial
+        for callback in self.callbacks:
+            callback()
+
+    def add_callback(self, callback):
+        self.callbacks.append(callback)
+
+class ImitationModels:
+    def __init__(self, dao):
+        self.models = {}
+        self.dao = dao
+
+    def index(self, n):
+        for nickname, messages in self.dao.nickname_messages():
+            imitator = Imitator(messages)
+            imitator.index(n)
+            self.models[nickname] = imitator
+
+    def generate_imitation(self, nickname):
+        try:
+            model = self.models[nickname]
+        except KeyError:
+            pass # TODO: specify error here
+        else:
+            return model.generate_sentence()

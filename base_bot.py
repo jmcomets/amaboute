@@ -52,8 +52,11 @@ class BaseBot:
         except RuntimeError as e:
             logging.error(str(e))
         else:
-            self.send_message(target, '[{}]: {}'.format(nick, message))
-            self.send_message(target, '(sent by: {})'.format(sender))
+            self.send_message(target,
+                              ('[{}]: {}'
+                               '\n'
+                               '(sent by: {})')
+                              .format(nick, message, sender))
 
     def load_and_index(self, n=2):
         self.load_latest_history()

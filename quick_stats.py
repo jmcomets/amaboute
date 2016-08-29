@@ -13,5 +13,5 @@ except IOError:
     print('could not open file {}'.format(history_file), file=sys.argv)
     sys.exit(1)
 
-for nick, messages in history.items():
+for nick, messages in sorted(history.items(), key=lambda x: len(x[1]), reverse=True):
     print('{} {}'.format(nick, len(messages)))

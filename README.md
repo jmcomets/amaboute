@@ -1,4 +1,4 @@
-irc-bots
+if-chatbots
 ========
 
 Some bots on [irc-if][].

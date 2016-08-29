@@ -97,13 +97,14 @@ class TelegramBot(BaseBot):
         if len(args) < 2:
             self.send_message_to_user(username, 'You could at least tell me WHO you want to imitate!')
             return
-        user_to_imitate = self._guess_username(' '.join(args[1:]))
+        tried_username = ' '.join(args[1:])
+        user_to_imitate = self._guess_username(tried_username)
         if user_to_imitate is None:
             user_list = '\n'.join(map(lambda k: '- {}'.format(k), self.history))
             self.send_message_to_user(username, "Either you're drunk, dumb or "
                                                 "an asshole, but {} ain't in "
                                                 "my book. Here's those I know "
-                                                "so far:\n{}".format(user_to_imitate,
+                                                "so far:\n{}".format(tried_username,
                                                                      user_list))
             return
         self.imitate_nick(self.channel, username, user_to_imitate)

@@ -1,6 +1,6 @@
 import logging
 from difflib import get_close_matches
-from telegram.ext import Updater
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from slugify import slugify
 
 logging.basicConfig(level=logging.DEBUG,
@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.DEBUG,
                             '%(levelname)s - '
                             '%(message)s'))
 
-from models import Dao
+from models import add_message, get_registered_profiles, get_history
 from imitate import Imitator
 
 class TelegramBot:
@@ -23,12 +23,11 @@ class TelegramBot:
         self.countdown = Countdown(nb_messages_before_backup)
         self.countdown.add_callback(self.on_countdown_finished)
         self.indexing_dimension = default_index_dimension
-        self.Dao = dao()
         self.setup_commands()
-        self.imitation_models = ImitationModels(self.dao)
+        self.imitation_models = ImitationModels()
 
     def setup_commands(self):
-        self.updater.dispatcher.addTelegramMessageHandler(self.message_handler)
+        self.updater.dispatcher.add_handler(MessageHandler([Filters.text], self.message_handler))
         self.add_command('imitate', aliases=['i'])
         self.add_command('dimension', aliases=['n'], admin_only=True)
         self.add_command('index', admin_only=True, fn=self.index_models, aliases=['r'])
@@ -66,9 +65,9 @@ class TelegramBot:
                 fn(username, update.message.text)
 
         # add commands
-        self.updater.dispatcher.addTelegramCommandHandler(name, inner)
+        self.updater.dispatcher.add_handler(CommandHandler(name, inner))
         for alias in aliases:
-            self.updater.dispatcher.addTelegramCommandHandler(alias, inner)
+            self.updater.dispatcher.add_handler(CommandHandler(alias, inner))
 
     def send_message(self, target, message):
         if self.bot is not None:
@@ -98,7 +97,7 @@ class TelegramBot:
 
     def get_registered_nicknames(self):
         return set(map(lambda p: p.nickname,
-                       self.dao.registered_profiles()))
+                       get_registered_profiles()))
 
     def guess_username(self, username):
         username = username.lower()
@@ -130,9 +129,14 @@ class TelegramBot:
         self.imitate_nick(username, user_to_imitate)
 
     def imitate_nick(self, username, user_to_imitate):
-        imitation = self.imitation_models.generate_imitation(user_to_imitate)
+        try:
+            imitation = self.imitation_models.generate_imitation(user_to_imitate)
+        except NoSuchNick:
+            self.send_message_to_user(username, 'no such nickname {}'.format(user_to_imitate))
+            return
         if imitation is None:
-            return # TODO: error logging
+            self.send_message_to_user(username, 'could not generate an imitation')
+            return
         self.send_message(('[{}]: {}'
                            '\n'
                            '(sent by: {})').format(username,
@@ -143,7 +147,7 @@ class TelegramBot:
         self.imitation_models.index(self.indexing_dimension)
 
     def on_message(self, username, message):
-        self.dao.add_message(username, message)
+        add_message(username, message)
 
     def on_countdown_finished(self):
         self.index_models()
@@ -179,20 +183,20 @@ class Countdown:
         self.callbacks.append(callback)
 
 class ImitationModels:
-    def __init__(self, dao):
+    def __init__(self):
         self.models = {}
-        self.dao = dao
 
     def index(self, n):
-        for nickname, messages in self.dao.nickname_messages():
-            imitator = Imitator(messages)
-            imitator.index(n)
-            self.models[nickname] = imitator
+        for nickname, messages in get_history():
+            self.models[nickname] = Imitator(messages, n)
 
     def generate_imitation(self, nickname):
         try:
             model = self.models[nickname]
         except KeyError:
-            pass # TODO: specify error here
+            raise NoSuchNick
         else:
             return model.generate_sentence()
+
+class NoSuchNick(ValueError):
+    pass

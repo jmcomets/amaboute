@@ -80,45 +80,22 @@ if __name__ == '__main__':
     import sys
     import csv
 
-    sys.path.append('.')
-    sys.path.append('..')
-    from history import load_history, history_times
+    from models import get_registered_profiles
 
-    if len(sys.argv) < 2:
-        print('no file given', file=sys.stderr)
-        sys.exit(1)
-
-    source_filename = sys.argv[1]
-    dest_filename = None
     window_duration = 5 * 60
 
     if len(sys.argv) > 2:
-        dest_filename = sys.argv[2]
-    if len(sys.argv) > 3:
         try:
-            window_duration = int(sys.argv[3])
+            window_duration = int(sys.argv[1])
             if window_duration <= 0:
                 raise ValueError
         except ValueError:
             print('window duration should be a positive integer', file=sys.stderr)
             sys.exit(1)
 
-    data = load_history(source_filename)
-
-    # format data by nickname
-    data_by_nickname = { n : list(history_times(tm)) for n, tm in data.items() }
+    profiles = get_registered_profiles()
+    data_by_nickname = { profile.nickname : list(map(lambda m: m.timestamp.timestamp(), profile.messages)) for profile in profiles }
 
     presence_matrix = compute_presence_matrix(data_by_nickname, window_duration)
-    classes = set(presence_matrix.keys())
 
-    def write_presence_matrix(presence_matrix, fp):
-        writer = csv.DictWriter(fp, sorted(classes))
-        writer.writeheader()
-        for nickname, adjacencies in sorted(presence_matrix.items(), key=lambda x: x[0]):
-            writer.writerow(adjacencies)
-
-    if dest_filename is not None:
-        with open(dest_filename, 'w') as fp:
-            write_presence_matrix(presence_matrix, fp)
-    else:
-        write_presence_matrix(presence_matrix, sys.stdout)
+    import pprint; pprint.pprint(presence_matrix)

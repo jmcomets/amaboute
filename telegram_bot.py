@@ -35,7 +35,7 @@ class TelegramBot:
     def get_username(self, user):
         username = user.username
         if not username:
-            username = slugify('{} {}'.format(user.first_name, user.last_name))
+            username = slugify('{} {}'.format(user.first_name, user.last_name), to_lower=True)
         else:
             username = username.lower()
         return username

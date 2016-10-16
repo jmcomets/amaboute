@@ -33,6 +33,10 @@ except pd.io.common.CParserError:
     sys.exit(1)
 labels = list(data.columns.values)
 
+dest_filename = None
+if len(sys.argv) > 2:
+    dest_filename = sys.argv[2]
+
 # Normalize data columns
 data = (data - data.mean()) / (data.max() - data.min())
 
@@ -73,4 +77,7 @@ for t in ax.yaxis.get_major_ticks():
     t.tick1On = False
     t.tick2On = False
 
-plt.show()
+if dest_filename is not None:
+    plt.savefig(dest_filename)
+else:
+    plt.show()

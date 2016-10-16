@@ -53,7 +53,7 @@ def compute_presence_matrix(data_by_nickname, window_duration, as_probability=Tr
             windows.append(window)
             window, start_time = set([class_]), t
 
-    classes = list(set(it.chain.from_iterable(windows)))
+    classes = set(it.chain.from_iterable(windows))
     presence_matrix = { c : { c : 0 for c in classes } for c in classes }
 
     for window in windows:
@@ -69,15 +69,18 @@ def compute_presence_matrix(data_by_nickname, window_duration, as_probability=Tr
     if as_probability:
         for nickname, adjacencies in presence_matrix.items():
             total = sum(adjacencies.values())
+            if total == 0:
+                continue
             for other_nickname in adjacencies:
                 adjacencies[other_nickname] /= total
-    return presence_matrix, classes
+    return presence_matrix
 
 if __name__ == '__main__':
     import sys
     import csv
 
     sys.path.append('.')
+    sys.path.append('..')
     from history import load_history, history_times
 
     if len(sys.argv) < 2:
@@ -86,16 +89,26 @@ if __name__ == '__main__':
 
     source_filename = sys.argv[1]
     dest_filename = None
+    window_duration = 5 * 60
 
     if len(sys.argv) > 2:
         dest_filename = sys.argv[2]
+    if len(sys.argv) > 3:
+        try:
+            window_duration = int(sys.argv[3])
+            if window_duration <= 0:
+                raise ValueError
+        except ValueError:
+            print('window duration should be a positive integer', file=sys.stderr)
+            sys.exit(1)
 
     data = load_history(source_filename)
 
     # format data by nickname
     data_by_nickname = { n : list(history_times(tm)) for n, tm in data.items() }
 
-    presence_matrix, classes = compute_presence_matrix(data_by_nickname, window_duration=1200)
+    presence_matrix = compute_presence_matrix(data_by_nickname, window_duration)
+    classes = set(presence_matrix.keys())
 
     def write_presence_matrix(presence_matrix, fp):
         writer = csv.DictWriter(fp, sorted(classes))

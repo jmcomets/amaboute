@@ -42,10 +42,10 @@ def get_or_create(session, model, **kwargs):
         session.commit()
         return instance
 
-def add_message(nickname, message):
+def add_message(nickname, message, timestamp=None):
     session = Session()
     profile = get_or_create(session, Profile, nickname=nickname)
-    session.add(Message(profile_id=profile.id, text=message))
+    session.add(Message(profile_id=profile.id, text=message, timestamp=datetime.datetime.fromtimestamp(timestamp)))
     session.commit()
 
 def get_registered_profiles():
@@ -60,6 +60,14 @@ def does_nickname_exist(nickname):
     q = session.query(Profile).filter(Profile.nickname == nickname)
     return session.query(literal(True)).filter(q.exists()).scalar() is True
 
+def merge_profiles(dest, source):
+    session = Session()
+    dest_profile = get_or_create(session, Profile, nickname=dest)
+    source_profile = session.query(Profile).filter_by(nickname=source).first()
+    for message in session.query(Message).filter_by(profile_id=source_profile.id):
+        message.nickname_id = dest_profile.id
+    session.delete(source_profile)
+    session.commit()
 
 if __name__ == '__main__':
     Base.metadata.create_all(engine)

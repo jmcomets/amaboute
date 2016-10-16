@@ -1,4 +1,6 @@
 import sys
+
+sys.path.append('.')
 from models import does_nickname_exist, add_message
 
 if len(sys.argv) < 2:

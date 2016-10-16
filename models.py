@@ -49,7 +49,12 @@ def add_message(nickname, message, timestamp=None):
     session.commit()
 
 def get_registered_profiles():
-    return Session().query(Profile).all()
+    session = Session()
+    return session.query(Profile).all()
+
+def get_registered_nicknames():
+    return map(lambda p: p.nickname, get_registered_profiles())
+
 
 def get_history():
     for p in get_registered_profiles():

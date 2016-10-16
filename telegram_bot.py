@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.DEBUG,
                             '%(levelname)s - '
                             '%(message)s'))
 
-from models import add_message, get_registered_profiles, get_history
+from models import add_message, get_registered_nicknames, get_history
 from imitate import Imitator
 
 class TelegramBot:
@@ -95,13 +95,9 @@ class TelegramBot:
             self.indexing_dimension = n
             self.index_models()
 
-    def get_registered_nicknames(self):
-        return set(map(lambda p: p.nickname,
-                       get_registered_profiles()))
-
     def guess_username(self, username):
         username = username.lower()
-        candidates = self.get_registered_nicknames()
+        candidates = set(get_registered_nicknames())
         if username in candidates:
             return username
         matches = get_close_matches(username, candidates, 1)
@@ -111,7 +107,7 @@ class TelegramBot:
             return None
 
     def imitate_command(self, username, message):
-        candidates = self.get_registered_nicknames()
+        candidates = set(get_registered_nicknames())
         args = message.strip().split()
         if len(args) < 2:
             self.send_message_to_user(username, 'You could at least tell me WHO you want to imitate!')
@@ -188,7 +184,9 @@ class ImitationModels:
 
     def index(self, n):
         for nickname, messages in get_history():
-            self.models[nickname] = Imitator(messages, n)
+            imitator = Imitator(messages)
+            imitator.index(n)
+            self.models[nickname] = imitator
 
     def generate_imitation(self, nickname):
         try:

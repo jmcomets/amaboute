@@ -1,6 +1,8 @@
 amaboute
 ========
 
+Currently working on: auto-imitation
+
 ## Wishlist
 
 1. Randomized links/stickers/mentions/replies

@@ -107,6 +107,11 @@ def get_registered_profiles_and_message_count(s):
     nb_messages = func.count(Message.profile_id).label('nb_messages')
     return s.query(Profile.nickname, nb_messages).join(Profile.messages).group_by(Profile.nickname).all()
 
+@using_session
+def get_last_poster(s):
+    last_time = func.max(Message.timestamp).label('last_time')
+    nickname, date = s.query(Profile.nickname, last_time).join(Profile.messages).first()
+    return nickname, date.timestamp()
+
 if __name__ == '__main__':
-    print(get_registered_profiles_and_message_count())
-    #Base.metadata.create_all(engine)
+    Base.metadata.create_all(engine)

@@ -76,6 +76,10 @@ def compute_presence_matrix(data_by_nickname, window_duration, as_probability=Tr
                 adjacencies[other_nickname] /= total
     return presence_matrix
 
+def compute_presence_matrix_from_history(history, window_duration, as_probability=True):
+    data_by_nickname = dict(map(lambda n_tm: (n_tm[0], list(map(lambda x: x[0], n_tm[1]))), history))
+    return compute_presence_matrix(data_by_nickname, window_duration, as_probability)
+
 if __name__ == '__main__':
     import sys
     import csv
@@ -93,8 +97,7 @@ if __name__ == '__main__':
             print('window duration should be a positive integer', file=sys.stderr)
             sys.exit(1)
 
-    data_by_nickname = dict(map(lambda n_tm: (n_tm[0], list(map(lambda x: x[0], n_tm[1]))), get_history()))
-
-    presence_matrix = compute_presence_matrix(data_by_nickname, window_duration)
+    history = get_history()
+    presence_matrix = compute_presence_matrix_from_history(history, window_duration)
 
     import pprint; pprint.pprint(presence_matrix)

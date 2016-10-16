@@ -80,7 +80,7 @@ if __name__ == '__main__':
     import sys
     import csv
 
-    from models import get_registered_profiles
+    from models import get_history
 
     window_duration = 5 * 60
 
@@ -93,8 +93,7 @@ if __name__ == '__main__':
             print('window duration should be a positive integer', file=sys.stderr)
             sys.exit(1)
 
-    profiles = get_registered_profiles()
-    data_by_nickname = { profile.nickname : list(map(lambda m: m.timestamp.timestamp(), profile.messages)) for profile in profiles }
+    data_by_nickname = dict(map(lambda n_tm: (n_tm[0], list(map(lambda x: x[0], n_tm[1]))), get_history()))
 
     presence_matrix = compute_presence_matrix(data_by_nickname, window_duration)
 

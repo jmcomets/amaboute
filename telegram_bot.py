@@ -43,26 +43,29 @@ class TelegramBot:
     def add_command(self, name, admin_only=False, fn=None, aliases=None):
         if aliases is None:
             aliases = []
-        logging.info('adding command: {}, aliases are {}'.format(name, ', '.join(aliases)))
+        logging.info('Adding command: {}, aliases are {}'.format(name, ', '.join(aliases)))
 
         # deduce command from methods
         if fn is None:
             try:
                 fn = getattr(self, '{}_command'.format(name))
             except AttributeError:
-                raise NotImplementedError('command {} not implemented'.format(name))
+                raise NotImplementedError('Command {} not implemented'.format(name))
         else:
             old_fn, fn = fn, lambda _1, _2: old_fn()
 
         # decorator
         def inner(bot, update):
-            logging.info('processing command {}'.format(name))
             self.bot = bot
             username = self.get_username(update.message.from_user)
             has_authorization = not admin_only or username == self.admin
             spamming = update.message.chat_id == self.channel
             if has_authorization and not spamming:
+                logging.info('Processing command "{}"'.format(name))
                 fn(username, update.message.text)
+                logging.info('Command "{}" done'.format(name))
+            else:
+                logging.info('Ignored command "{}" (sent by {})'.format(name, username))
 
         # add commands
         self.updater.dispatcher.add_handler(CommandHandler(name, inner))
@@ -71,14 +74,17 @@ class TelegramBot:
 
     def send_message(self, target, message):
         if self.bot is not None:
-            logging.info('sending {} to {}'.format(message, target))
+            logging.info('Sending "{}" to {}'.format(message, target))
             self.bot.sendMessage(chat_id=target, text=message)
+
+    def send_message_to_channel(self, message):
+        self.send_message(self.channel, message)
 
     def send_message_to_user(self, username, message):
         try:
             user_id = self.user_ids[username]
         except KeyError:
-            logging.error('could not send message to {}: no associated user ID'.format(username))
+            logging.error('Could not send message to {}: no associated user ID'.format(username))
         else:
             self.send_message(user_id, message)
 
@@ -128,16 +134,16 @@ class TelegramBot:
         try:
             imitation = self.imitation_models.generate_imitation(user_to_imitate)
         except NoSuchNick:
-            self.send_message_to_user(username, 'no such nickname {}'.format(user_to_imitate))
+            self.send_message_to_user(username, 'No such nickname {}'.format(user_to_imitate))
             return
         if imitation is None:
-            self.send_message_to_user(username, 'could not generate an imitation')
+            self.send_message_to_user(username, 'Could not generate an imitation')
             return
-        self.send_message(('[{}]: {}'
-                           '\n'
-                           '(sent by: {})').format(username,
-                                                   imitation,
-                                                   user_to_imitate))
+        self.send_message_to_channel(('[{}]: {}'
+                                      '\n'
+                                      '(sent by: {})').format(username,
+                                                              imitation,
+                                                              user_to_imitate))
 
     def index_models(self):
         self.imitation_models.index(self.indexing_dimension)
@@ -155,7 +161,7 @@ class TelegramBot:
         self.user_ids[username] = user.id
         message = update.message.text
         chat = update.message.chat_id
-        logging.info('received a message from {} on {}: {}'.format(username, chat, message))
+        logging.info('Received a message from {} on {}: {}'.format(username, chat, message))
         self.on_message(username, message)
         self.countdown.tick()
 
@@ -183,7 +189,9 @@ class ImitationModels:
         self.models = {}
 
     def index(self, n):
-        for nickname, messages in get_history():
+        history = list(get_history())
+        for nickname, timed_messages in history:
+            _, messages = zip(*timed_messages)
             imitator = Imitator(messages)
             imitator.index(n)
             self.models[nickname] = imitator

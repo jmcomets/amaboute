@@ -39,10 +39,9 @@ class MessagesModel(NewlineText):
 if __name__ == '__main__':
     import sys
 
-    from models import get_registered_profiles
+    from models import get_registered_nicknames, get_profile_messages
 
-    registered_profiles = get_registered_profiles()
-    registered_nicknames = set(map(lambda p: p.nickname, registered_profiles))
+    registered_nicknames = get_registered_nicknames()
 
     if len(sys.argv) < 2:
         print('No nickname given', file=sys.stderr)
@@ -68,9 +67,9 @@ if __name__ == '__main__':
         except ValueError:
             print('N should be a positive integer', file=sys.stderr)
 
-    profiles_by_nickname = dict(map(lambda p: (p.nickname, p), registered_profiles))
-    messages = list(map(lambda m: m.text, profiles_by_nickname[nickname].messages))
+    messages = get_profile_messages(nickname)
 
     imitator = Imitator(messages)
-    imitator.index(2)
+    imitator.index(n)
+
     print(imitator.generate_sentence())

@@ -1,7 +1,6 @@
 import itertools as it
 
 import numpy as np
-from scipy.signal import medfilt
 
 def compute_present_classes_by_timestamp(data_by_nickname):
     time_classes = None
@@ -16,12 +15,14 @@ def compute_present_classes_by_timestamp(data_by_nickname):
 
         # compute local derivatives
         DT = np.array([0] + list(map(lambda x: x[0] - x[1], zip(T[1:], T[:-1]))))
+
         # TODO: apply smoothing ?
-        if np.max(DT) == 0:
+
+        # low derivative -> presence
+        avg = np.average(DT)
+        P = np.vectorize(lambda x: x < avg, otypes=[np.bool])(DT)
+        if not P.any():
             continue
-        DT = (DT - np.min(DT)) / (np.max(DT) - np.min(DT))
-        # FIXME: use average filter instead, there's probably many low ds
-        P = np.vectorize(lambda x: x < 0.5, otypes=[np.bool])(medfilt(DT))
 
         F = np.column_stack((T, P, C))
         F = np.array(list(filter(lambda x: x[1], F)))

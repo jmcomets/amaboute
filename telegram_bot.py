@@ -1,4 +1,3 @@
-import random
 import logging
 from difflib import get_close_matches
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
@@ -12,7 +11,7 @@ logging.basicConfig(level=logging.DEBUG,
 
 from models import add_message, get_registered_nicknames, get_history, get_last_poster
 from imitate import Imitator
-from correlations import compute_presence_matrix_from_history
+from conversations import NicknameGenerator, NoSuchNick as NoSuchNickInGenerator
 
 class TelegramBot:
     def __init__(self, token, admin, channel,
@@ -146,7 +145,7 @@ class TelegramBot:
     def autoimitate_command(self):
         last_poster = self.get_last_poster()
         try:
-            nickname = self.imitation_models.generate_next_nickname(last_poster)
+            nickname = self.imitation_models.generate_nickname(last_poster)
         except NotIndexed:
             self.send_message_to_user(username, 'Need to index first')
         else:
@@ -211,48 +210,39 @@ class Countdown:
 
 class ImitationModels:
     def __init__(self):
-        self.models = None
-        self.correlations = None
+        self.imitator = None
+        self.nick_generator = None
 
     def index(self, dimension, nb_samples=500, window_duration=10 * 60):
-        self.models = self.correlations = None
+        self.imitator = self.nick_generator = None
         history = list(get_history())
 
-        self.models = {}
+        self.imitator = {}
         for nickname, timed_messages in history:
             _, messages = zip(*timed_messages)
             imitator = Imitator(messages)
             imitator.index(dimension)
-            self.models[nickname] = imitator
+            self.imitator[nickname] = imitator
 
-        presence_matrix = compute_presence_matrix_from_history(history, window_duration)
-        self.correlations = {}
-        for nickname, adjacencies in presence_matrix.items():
-            choices = []
-            for n, p in adjacencies.items():
-                weight = int(p * nb_samples)
-                choices += [n] * weight
-            self.correlations[nickname] = choices
+        self.nick_generator = NicknameGenerator(history, nb_samples, window_duration)
 
-    def generate_next_nickname(self, nickname):
-        if self.models is None or self.correlations is None:
+    def generate_nickname(self, nickname):
+        if self.nick_generator is None:
             raise NotIndexed
         try:
-            model = self.models[nickname]
-        except KeyError:
+            return self.nick_generator.generate_nickname(nickname)
+        except NoSuchNickInGenerator:
             raise NoSuchNick
-        else:
-            return random.choice(model)
 
     def generate_imitation(self, nickname):
-        if self.models is None or self.correlations is None:
+        if self.imitator is None:
             raise NotIndexed
         try:
-            model = self.models[nickname]
+            imitator = self.imitator[nickname]
         except KeyError:
             raise NoSuchNick
         else:
-            return model.generate_sentence()
+            return imitator.generate_sentence()
 
 class NoSuchNick(ValueError):
     pass

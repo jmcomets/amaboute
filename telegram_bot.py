@@ -190,6 +190,8 @@ class TelegramBot:
         self.countdown.tick()
 
     def run(self):
+        logging.info('Indexing models for the first time...')
+        self.index_models()
         self.updater.start_polling()
 
 class Countdown:

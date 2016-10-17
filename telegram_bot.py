@@ -177,7 +177,7 @@ class Countdown:
     def tick(self):
         self.current -= 1
         if self.current <= 0:
-            self.current = initial
+            self.current = self.initial
         for callback in self.callbacks:
             callback()
 

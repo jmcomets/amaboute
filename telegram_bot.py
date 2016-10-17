@@ -142,7 +142,7 @@ class TelegramBot:
         self.last_poster = last_poster
         return db_nickname
 
-    def autoimitate_command(self, _1, _2):
+    def autoimitate_command(self, username, _):
         last_poster = self.get_last_poster()
         try:
             nickname = self.imitation_models.generate_nickname(last_poster)
@@ -165,9 +165,9 @@ class TelegramBot:
             return
         self.send_message_to_channel(('[{}]: {}'
                                       '\n'
-                                      '(sent by: {})').format(username,
+                                      '(sent by: {})').format(user_to_imitate,
                                                               imitation,
-                                                              user_to_imitate))
+                                                              username))
 
     def index_models(self):
         self.imitation_models.index(self.indexing_dimension)
@@ -230,7 +230,7 @@ class ImitationModels:
         if self.nick_generator is None:
             raise NotIndexed
         try:
-            return self.nick_generator.generate_nickname(nickname)
+            return self.nick_generator.generate(nickname)
         except NoSuchNickInGenerator:
             raise NoSuchNick
 

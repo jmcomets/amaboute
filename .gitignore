@@ -5,3 +5,4 @@ __pycache__
 /backups/*
 /data/*
 /scraping/*
+messages.db

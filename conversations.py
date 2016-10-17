@@ -131,4 +131,4 @@ if __name__ == '__main__':
     history = get_history()
 
     gen = NicknameGenerator(history, nb_samples, window_duration)
-    print(gen.generate(nickname))
+    print('next nickname: %s' % gen.generate(nickname))

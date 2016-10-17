@@ -1,3 +1,4 @@
+import random
 import itertools as it
 
 import numpy as np
@@ -76,25 +77,58 @@ def compute_presence_matrix(data_by_nickname, window_duration, as_probability=Tr
                 adjacencies[other_nickname] /= total
     return presence_matrix
 
+def compute_presence_matrix_from_history(history, window_duration, as_probability=True):
+    data_by_nickname = dict(map(lambda n_tm: (n_tm[0], list(map(lambda x: x[0], n_tm[1]))), history))
+    return compute_presence_matrix(data_by_nickname, window_duration, as_probability)
+
+class NicknameGenerator:
+    def __init__(self, history, nb_samples, window_duration):
+        self.models = {}
+        presence_matrix = compute_presence_matrix_from_history(history, window_duration)
+        for nickname, adjacencies in presence_matrix.items():
+            choices = []
+            for n, p in adjacencies.items():
+                weight = int(p * nb_samples)
+                choices += [n] * weight
+            self.models[nickname] = choices
+
+    def generate(self, nickname):
+        try:
+            model = self.models[nickname]
+        except KeyError:
+            raise NoSuchNick
+        return random.choice(model)
+
+class NoSuchNick(ValueError):
+    pass
+
 if __name__ == '__main__':
     import sys
     import csv
 
-    from models import get_history
+    from models import get_history, get_registered_nicknames
+
+    registered_nicknames = get_registered_nicknames()
+
+    if len(sys.argv) < 2:
+        print('No nickname given', file=sys.stderr)
+        if registered_nicknames:
+            print('Choose one of:', file=sys.stderr)
+            print('\n'.join(map(lambda n: '* %s' % n, registered_nicknames)), file=sys.stderr)
+        sys.exit(1)
+    nickname = sys.argv[1]
+
+    if nickname not in registered_nicknames:
+        print('Invalid nickname given', file=sys.stderr)
+        if registered_nicknames:
+            print('Choose one of:', file=sys.stderr)
+            print('\n'.join(map(lambda n: '* %s' % n, registered_nicknames)), file=sys.stderr)
+        sys.exit(1)
 
     window_duration = 5 * 60
+    nb_samples = 500
 
-    if len(sys.argv) > 2:
-        try:
-            window_duration = int(sys.argv[1])
-            if window_duration <= 0:
-                raise ValueError
-        except ValueError:
-            print('window duration should be a positive integer', file=sys.stderr)
-            sys.exit(1)
+    history = get_history()
 
-    data_by_nickname = dict(map(lambda n_tm: (n_tm[0], list(map(lambda x: x[0], n_tm[1]))), get_history()))
-
-    presence_matrix = compute_presence_matrix(data_by_nickname, window_duration)
-
-    import pprint; pprint.pprint(presence_matrix)
+    gen = NicknameGenerator(history, nb_samples, window_duration)
+    print(gen.generate(nickname))

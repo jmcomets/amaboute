@@ -9,8 +9,9 @@ logging.basicConfig(level=logging.DEBUG,
                             '%(levelname)s - '
                             '%(message)s'))
 
-from models import add_message, get_registered_nicknames, get_history
+from models import add_message, get_registered_nicknames, get_history, get_last_poster
 from imitate import Imitator
+from conversations import NicknameGenerator, NoSuchNick as NoSuchNickInGenerator
 
 class TelegramBot:
     def __init__(self, token, admin, channel,
@@ -25,10 +26,12 @@ class TelegramBot:
         self.indexing_dimension = default_index_dimension
         self.setup_commands()
         self.imitation_models = ImitationModels()
+        self.last_poster = None
 
     def setup_commands(self):
         self.updater.dispatcher.add_handler(MessageHandler([Filters.text], self.message_handler))
         self.add_command('imitate', aliases=['i'])
+        self.add_command('autoimitate', aliases=['a'])
         self.add_command('dimension', aliases=['n'], admin_only=True)
         self.add_command('index', admin_only=True, fn=self.index_models, aliases=['r'])
 
@@ -130,9 +133,30 @@ class TelegramBot:
             return
         self.imitate_nick(username, user_to_imitate)
 
+    def get_last_poster(self):
+        db_nickname, db_timestamp = last_poster = get_last_poster()
+        if self.last_poster is not None:
+            nickname, timestamp = self.last_poster
+            if timestamp > db_timestamp:
+                return nickname
+        self.last_poster = last_poster
+        return db_nickname
+
+    def autoimitate_command(self):
+        last_poster = self.get_last_poster()
+        try:
+            nickname = self.imitation_models.generate_nickname(last_poster)
+        except NotIndexed:
+            self.send_message_to_user(username, 'Need to index first')
+        else:
+            self.imitate_nick('amaboute', nickname)
+
     def imitate_nick(self, username, user_to_imitate):
         try:
             imitation = self.imitation_models.generate_imitation(user_to_imitate)
+        except NotIndexed:
+            self.send_message_to_user(username, 'Need to index first')
+            return
         except NoSuchNick:
             self.send_message_to_user(username, 'No such nickname {}'.format(user_to_imitate))
             return
@@ -186,23 +210,42 @@ class Countdown:
 
 class ImitationModels:
     def __init__(self):
-        self.models = {}
+        self.imitator = None
+        self.nick_generator = None
 
-    def index(self, n):
+    def index(self, dimension, nb_samples=500, window_duration=10 * 60):
+        self.imitator = self.nick_generator = None
         history = list(get_history())
+
+        self.imitator = {}
         for nickname, timed_messages in history:
             _, messages = zip(*timed_messages)
             imitator = Imitator(messages)
-            imitator.index(n)
-            self.models[nickname] = imitator
+            imitator.index(dimension)
+            self.imitator[nickname] = imitator
+
+        self.nick_generator = NicknameGenerator(history, nb_samples, window_duration)
+
+    def generate_nickname(self, nickname):
+        if self.nick_generator is None:
+            raise NotIndexed
+        try:
+            return self.nick_generator.generate_nickname(nickname)
+        except NoSuchNickInGenerator:
+            raise NoSuchNick
 
     def generate_imitation(self, nickname):
+        if self.imitator is None:
+            raise NotIndexed
         try:
-            model = self.models[nickname]
+            imitator = self.imitator[nickname]
         except KeyError:
             raise NoSuchNick
         else:
-            return model.generate_sentence()
+            return imitator.generate_sentence()
 
 class NoSuchNick(ValueError):
+    pass
+
+class NotIndexed(ValueError):
     pass

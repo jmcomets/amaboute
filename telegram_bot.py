@@ -142,7 +142,7 @@ class TelegramBot:
         self.last_poster = last_poster
         return db_nickname
 
-    def autoimitate_command(self):
+    def autoimitate_command(self, _1, _2):
         last_poster = self.get_last_poster()
         try:
             nickname = self.imitation_models.generate_nickname(last_poster)

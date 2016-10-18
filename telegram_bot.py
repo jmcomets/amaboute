@@ -195,20 +195,23 @@ class TelegramBot:
         self.updater.start_polling()
 
 class Countdown:
-    def __init__(self, initial):
+    def __init__(self, delay):
         self.callbacks = []
-        self.initial = initial
-        self.current = initial
+        self.delay = delay
+        self.current = delay
 
     def tick(self):
         self.current -= 1
         if self.current <= 0:
-            self.current = self.initial
-        for callback in self.callbacks:
-            callback()
+            self.trigger_callbacks()
+            self.current = self.delay
 
     def add_callback(self, callback):
         self.callbacks.append(callback)
+
+    def trigger_callbacks(self):
+        for callback in self.callbacks:
+            callback()
 
 class ImitationModels:
     def __init__(self):

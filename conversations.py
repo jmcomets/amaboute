@@ -15,7 +15,7 @@ def compute_present_classes_by_timestamp(data_by_nickname):
         T = np.array(timestamps)
 
         # compute local derivatives
-        DT = np.array([0] + list(map(lambda x: x[0] - x[1], zip(T[1:], T[:-1]))))
+        DT = np.concatenate(([0], np.diff(T)))
 
         # TODO: apply smoothing ?
 

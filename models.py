@@ -96,8 +96,9 @@ def merge_profiles(s, dest, source):
     source_profile = s.query(Profile).filter_by(nickname=source).first()
     dest_profile = get_or_create(s, Profile, nickname=dest)
 
-    for message in s.query(Message).filter_by(profile_id=source_profile.id):
-        message.nickname_id = dest_profile.id
+    s.query(Message)\
+            .filter_by(profile_id=source_profile.id)\
+            .update({ 'profile_id': dest_profile.id })
     s.commit()
 
     s.delete(source_profile)

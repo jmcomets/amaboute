@@ -26,14 +26,14 @@ class TelegramBot:
         self.indexing_dimension = default_index_dimension
         self.setup_commands()
         self.imitation_models = ImitationModels()
-        self.last_poster = None
+        self.last_poster, _ = get_last_poster()
 
     def setup_commands(self):
         self.updater.dispatcher.add_handler(MessageHandler([Filters.text], self.message_handler))
         self.add_command('imitate', aliases=['i'])
         self.add_command('autoimitate', aliases=['a'])
         self.add_command('dimension', aliases=['n'], admin_only=True)
-        self.add_command('index', admin_only=True, fn=self.index_models, aliases=['r'])
+        self.add_command('index', aliases=['r'], admin_only=True, fn=self.index_models)
 
     def get_username(self, user):
         username = user.username
@@ -133,19 +133,9 @@ class TelegramBot:
             return
         self.imitate_nick(username, user_to_imitate)
 
-    def get_last_poster(self):
-        db_nickname, db_timestamp = last_poster = get_last_poster()
-        if self.last_poster is not None:
-            nickname, timestamp = self.last_poster
-            if timestamp > db_timestamp:
-                return nickname
-        self.last_poster = last_poster
-        return db_nickname
-
     def autoimitate_command(self, username, _):
-        last_poster = self.get_last_poster()
         try:
-            nickname = self.imitation_models.generate_nickname(last_poster)
+            nickname = self.imitation_models.generate_nickname(self.last_poster)
         except NotIndexed:
             self.send_message_to_user(username, 'Need to index first')
         else:
@@ -173,6 +163,8 @@ class TelegramBot:
         self.imitation_models.index(self.indexing_dimension)
 
     def on_message(self, username, message):
+        self.last_poster = username
+
         add_message(username, message)
 
     def on_countdown_finished(self):

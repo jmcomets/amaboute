@@ -162,7 +162,7 @@ class TelegramBot:
     def index_models(self):
         self.imitation_models.index(self.indexing_dimension)
 
-    def on_message(self, username, message):
+    def on_message(self, chat, username, message):
         self.last_poster = username
 
         add_message(username, message)
@@ -178,7 +178,7 @@ class TelegramBot:
         message = update.message.text
         chat = update.message.chat_id
         logging.info('Received a message from {} on {}: {}'.format(username, chat, message))
-        self.on_message(username, message)
+        self.on_message(chat, username, message)
         self.countdown.tick()
 
     def run(self):

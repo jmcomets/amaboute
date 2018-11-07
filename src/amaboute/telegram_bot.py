@@ -9,9 +9,9 @@ logging.basicConfig(level=logging.DEBUG,
                             '%(levelname)s - '
                             '%(message)s'))
 
-from models import add_message, get_registered_nicknames, get_history, get_last_poster
-from imitate import Imitator
-from conversations import NicknameGenerator, NoSuchNick as NoSuchNickInGenerator
+from amaboute.models import add_message, get_registered_nicknames, get_history, get_last_poster
+from amaboute.imitate import Imitator
+from amaboute.conversations import NicknameGenerator, NoSuchNick as NoSuchNickInGenerator
 
 class TelegramBot:
     def __init__(self, token, admin, channel,

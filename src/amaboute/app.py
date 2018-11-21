@@ -1,4 +1,5 @@
 import os
+from functools import wraps
 from amaboute.telegram_bot import TelegramBot
 
 def with_env(f):
@@ -16,7 +17,7 @@ def with_env(f):
                 if len(columns) < 2:
                     continue # TODO: log
                 key, value = columns[0], '='.join(columns[1:])
-                env[prefix % key.upper()] = value
+                env[prefix + key.upper()] = value
 
         # overwrite with entries from os.environ
         for key, value in os.environ.items():

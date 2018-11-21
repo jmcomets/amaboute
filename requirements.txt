@@ -2,7 +2,7 @@ awesome-slugify==1.6.5
 certifi==2016.9.26
 future==0.15.2
 markovify==0.4.0
-numpy==1.11.2
+numpy==1.15.2
 python-telegram-bot==5.0.0
 regex==2016.9.22
 SQLAlchemy==1.0.14

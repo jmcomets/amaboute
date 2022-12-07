@@ -1,5 +1,5 @@
 awesome-slugify==1.6.5
-certifi==2016.9.26
+certifi==2022.12.7
 future==0.15.2
 markovify==0.4.0
 numpy==1.15.2
